@@ -2,18 +2,16 @@
 // Implement struct Point to make it work.
 // Make it compile
 fn exercise1() {
-    let integer = Position { x: 5, y: 10 };
-    let float = Position { x: 1.0, y: 4.0 };
+    let integer = Point { x: 5, y: 10 };
+    let float = Point { x: 1.0, y: 4.0 };
 }
-
-
 
 // Exercise 2
 // Modify this struct to make the code work
 // Make it compile
-struct Point<T> {
+struct Point<T, U> {
     x: T,
-    y: T,
+    y: U,
 }
 
 fn exercise2() {
@@ -22,16 +20,15 @@ fn exercise2() {
 }
 
 
-
 // Exercise 3
 // Make it compile
 // Add generic for Val to make the code work, DON'T modify the code in `main`.
-struct Val {
-    val: f64,
+struct Val<T> {
+    val: T,
 }
 
-impl Val {
-    fn value(&self) -> &f64 {
+impl<T> Val<T> {
+    fn value(&self) -> &T {
         &self.val
     }
 }
@@ -48,24 +45,42 @@ fn exercise3() {
 // Make it compile
 // Implementing logic
 // Run tests
+fn find_max<T: Ord>(collection: &[T]) -> Option<&T> {
+    if collection.is_empty() {
+        return None;
+    }
 
-fn find_max<T>(collection: &[T]) -> Option<&T> {
-    todo!()
+    let mut max_element = &collection[0];
+
+    for item in collection {
+        if item > max_element {
+            max_element = item;
+        }
+    }
+
+    Some(max_element)
 }
 
 // Exercise 5 
 // Reverse the elements in a collection
 // Make it compile 
 // Run tests 
-fn reverse_collection<T>(collection: &[T]) {
-    todo!()
+fn reverse_collection<T>(collection: &mut Vec<T>) {
+    let len = collection.len();
+    for i in 0..len / 2 {
+        collection.swap(i, len - 1 - i);
+    }
 }
-
 
 // Exercise 6
 // Function to check if a collection contains a specific value
-fn contains_value<T>(collection: &[T], value: &T) -> bool {
-    todo!()
+fn contains_value<T: PartialEq>(collection: &[T], value: &T) -> bool {
+    for item in collection {
+        if item == value {
+            return true;
+        }
+    }
+    false
 }
 
 // Unit tests
