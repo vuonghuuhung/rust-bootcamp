@@ -2,9 +2,11 @@
 //! The atm may fail to give you cash if it is empty or you haven't swiped your card, or you have
 //! entered the wrong pin.
 
+use crate::traits::hash;
 use crate::traits::StateMachine;
 
 /// The keys on the ATM keypad
+#[derive(Hash, Debug, PartialEq, Clone)]
 pub enum Key {
     One,
     Two,
@@ -12,9 +14,6 @@ pub enum Key {
     Four,
     Enter,
 }
-
-
-
 
 /// Something you can do to the ATM
 pub enum Action {
@@ -26,7 +25,8 @@ pub enum Action {
 }
 
 /// The various states of authentication possible with the ATM
-enum Auth {
+#[derive(PartialEq, Debug, Clone)]
+pub enum Auth {
     /// No session has begun yet. Waiting for the user to swipe their card
     Waiting,
     /// The user has swiped their card, providing the enclosed PIN hash.
@@ -37,15 +37,13 @@ enum Auth {
     Authenticated,
 }
 
-
-
-
 /// The ATM. When a card is swiped, the ATM learns the correct pin's hash.
 /// It waits for you to key in your pin. You can press as many numeric keys as
 /// you like followed by enter. If the pin is incorrect, your card is returned
 /// and the ATM automatically goes back to the main menu. If your pin is correct,
 /// the ATM waits for you to key in an amount of money to withdraw. Withdraws
 /// are bounded only by the cash in the machine (there is no account balance).
+#[derive(Debug, PartialEq, Clone)]
 pub struct Atm {
     /// How much money is in the ATM
     cash_inside: u64,
@@ -55,32 +53,142 @@ pub struct Atm {
     keystroke_register: Vec<Key>,
 }
 
-
 //TODO
-// Implement trait Default for Auth 
-// return Waiting status 
+// Implement trait Default for Auth
+// return Waiting status
 impl Default for Auth {
-    
+    fn default() -> Self {
+        Auth::Waiting
+    }
 }
-
 
 //TODO
 // Implement trait From  for &str
 // Convert  elements in Key to &str
 impl From<Key> for &str {
+    fn from(key: Key) -> Self {
+        match key {
+            Key::One => "One",
+            Key::Two => "Two",
+            Key::Three => "Three",
+            Key::Four => "Four",
+            Key::Enter => "Enter",
+        }
+    }
 }
 
 impl StateMachine for Atm {
     // Notice that we are using the same type for the state as we are using for the machine this time.
-    type State;
-    type Transition;
+    type State = Self;
+    type Transition = Action;
     // Hint
     // Should use `default` method when auth status is Waiting status
     // Should use `from` method to convert  elements in Key to &str
     // Parse &str to integer to calculate amount
     // Use a hash function to verify the PIN both before and after the user presses the Enter key.
     fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-        todo!("Final project")
+        let pin = vec![Key::One, Key::Two, Key::Three, Key::Four];
+        let pin_hash = hash(&pin);
+
+        match (starting_state, t) {
+            (
+                Atm {
+                    cash_inside,
+                    expected_pin_hash: Auth::Waiting,
+                    keystroke_register,
+                },
+                Action::SwipeCard(pin_hash),
+            ) => Atm {
+                cash_inside: *cash_inside,
+                expected_pin_hash: Auth::Authenticating(*pin_hash),
+                keystroke_register: Vec::new(),
+            },
+            (
+                Atm {
+                    cash_inside,
+                    expected_pin_hash: Auth::Authenticating(pin_hash),
+                    keystroke_register,
+                },
+                Action::PressKey(Key::Enter),
+            ) => {
+                let user_pin_hash = hash(keystroke_register);
+                if user_pin_hash == pin_hash.clone() {
+                    Atm {
+                        cash_inside: *cash_inside,
+                        expected_pin_hash: Auth::Authenticated,
+                        keystroke_register: Vec::new(),
+                    }
+                } else {
+                    Atm {
+                        cash_inside: *cash_inside,
+                        expected_pin_hash: Auth::Waiting,
+                        keystroke_register: Vec::new(),
+                    }
+                }
+            },
+            (
+                Atm {
+                    cash_inside,
+                    expected_pin_hash: Auth::Authenticating(pin_hash),
+                    keystroke_register,
+                },
+                Action::PressKey(key_str),
+            ) => {
+                let mut keystroke_register_after = keystroke_register.clone();
+                if !keystroke_register.contains(key_str) {
+                    keystroke_register_after.push(key_str.clone());
+                }
+
+                Atm {
+                    cash_inside: *cash_inside,
+                    expected_pin_hash: Auth::Authenticating(*pin_hash),
+                    keystroke_register: keystroke_register_after,
+                }
+            }
+            (
+                Atm {
+                    cash_inside,
+                    expected_pin_hash: Auth::Authenticated,
+                    keystroke_register,
+                },
+                Action::PressKey(Key::Enter),
+            ) => {
+                // print!("{:#?}", keystroke_register);
+                if keystroke_register.len() <= 1 {
+                    Atm {
+                        cash_inside: *cash_inside - 1,
+                        expected_pin_hash: Auth::Waiting,
+                        keystroke_register: Vec::new(),
+                    }
+                } else {
+                    Atm {
+                        cash_inside: *cash_inside,
+                        expected_pin_hash: Auth::Waiting,
+                        keystroke_register: Vec::new(),
+                    }
+                }
+        },
+            (
+                Atm {
+                    cash_inside,
+                    expected_pin_hash: Auth::Authenticated,
+                    keystroke_register,
+                },
+                Action::PressKey(key_str),
+            ) => {
+                let mut keystroke_register_after = keystroke_register.clone();
+                if !keystroke_register.contains(key_str) {
+                    keystroke_register_after.push(key_str.clone());
+                }
+
+                Atm {
+                    cash_inside: *cash_inside,
+                    expected_pin_hash: Auth::Authenticated,
+                    keystroke_register: keystroke_register_after,
+                }
+            }
+            (state, _) => state.clone(),
+        }
     }
 }
 
@@ -184,7 +292,7 @@ fn sm_3_enter_single_digit_of_pin() {
 fn sm_3_enter_wrong_pin() {
     // Create hash of pin
     let pin = vec![Key::One, Key::Two, Key::Three, Key::Four];
-    let pin_hash = crate::hash(&pin);
+    let pin_hash = hash(&pin);
 
     let start = Atm {
         cash_inside: 10,
@@ -205,7 +313,7 @@ fn sm_3_enter_wrong_pin() {
 fn sm_3_enter_correct_pin() {
     // Create hash of pin
     let pin = vec![Key::One, Key::Two, Key::Three, Key::Four];
-    let pin_hash = crate::hash(&pin);
+    let pin_hash = hash(&pin);
 
     let start = Atm {
         cash_inside: 10,
